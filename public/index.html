@@ -4,78 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <title>AI Call Agent</title>
-
-    <!-- <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.10.1/dist/twilio.min.js"></script> -->
-    <script src="https://unpkg.com/@twilio/voice-sdk@2.10.0/dist/twilio.min.js"></script>
-
-    <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background: #f5f5f5;
-        }
-
-        button {
-            padding: 20px 40px;
-            font-size: 20px;
-            border-radius: 50px;
-            border: none;
-            cursor: pointer;
-            margin: 10px;
-        }
-
-        #call-btn {
-            background: #22c55e;
-            color: white;
-        }
-
-        #hangup-btn {
-            background: #ef4444;
-            color: white;
-            display: none;
-        }
-
-        #status {
-            font-size: 16px;
-            color: #666;
-            margin-top: 20px;
-        }
-    </style>
 </head>
 
 <body>
     <h2>🤖 AI Call Agent</h2>
-    <button id="call-btn">📞 Call Karo</button>
-    <button id="hangup-btn">📵 Hang Up</button>
-    <p id="status">Loading...</p>
+    <button id="call-btn"
+        style="padding:20px 40px;font-size:20px;background:#22c55e;color:white;border:none;border-radius:50px;cursor:pointer;">📞
+        Call Karo</button>
+    <button id="hangup-btn"
+        style="padding:20px 40px;font-size:20px;background:#ef4444;color:white;border:none;border-radius:50px;cursor:pointer;display:none;">📵
+        Hang Up</button>
+    <p id="status" style="font-size:16px;color:#666;">⏳ Loading SDK...</p>
+    <p id="error-detail" style="font-size:13px;color:red;"></p>
+
+    <!-- ✅ Sahi SDK — Direct Twilio CDN se -->
+    <script src="https://sdk.twilio.com/js/voice/releases/2.11.0/twilio.js"></script>
 
     <script>
-        let device;
-        let call;
-        const status = document.getElementById('status');
+        const statusEl = document.getElementById('status');
+        const errorEl = document.getElementById('error-detail');
         const callBtn = document.getElementById('call-btn');
         const hangupBtn = document.getElementById('hangup-btn');
 
+        let device, call;
+
+        function log(msg, isError) {
+            console.log(msg);
+            statusEl.textContent = msg;
+            if (isError) errorEl.textContent = msg;
+        }
+
         async function setup() {
             try {
+                log('🔄 Token le raha hun...');
                 const res = await fetch('/token');
+                if (!res.ok) throw new Error('Token fetch failed: ' + res.status);
+
                 const { token } = await res.json();
+                log('✅ Token mila — Device bana raha hun...');
 
-                // ✅ Naya SDK syntax
-                device = new Twilio.Device(token);
-
-                device.on('registered', () => {
-                    status.textContent = '✅ Ready — Call kar sakte ho!';
+                // ✅ edge: 'roaming' — 53000 fix karta hai
+                device = new Twilio.Device(token, {
+                    edge: 'roaming',
+                    logLevel: 1,
+                    codecPreferences: ['opus', 'pcmu']
                 });
 
-                device.on('error', (err) => {
-                    status.textContent = '❌ Error: ' + err.message;
-                    console.error(err);
+                device.on('registered', () => {
+                    log('✅ Ready! Call kar sakte ho.');
+                    callBtn.disabled = false;
+                });
+
+                device.on('error', (twilioError) => {
+                    log('❌ Error ' + twilioError.code + ': ' + twilioError.message, true);
+                    console.error(twilioError);
                 });
 
                 device.on('incoming', (incomingCall) => {
@@ -83,40 +65,41 @@
                     call.accept();
                 });
 
-                // ✅ Naya SDK mein register() call karna zaroori hai
+                log('🔄 Registering...');
+                callBtn.disabled = true;
                 await device.register();
 
             } catch (err) {
-                status.textContent = '❌ Setup failed: ' + err.message;
+                log('❌ Setup failed: ' + err.message, true);
                 console.error(err);
             }
         }
 
         callBtn.addEventListener('click', async () => {
             try {
-                status.textContent = '⏳ Connecting...';
-                // ✅ Naya SDK mein connect() async hai
-                call = await device.connect();
+                log('⏳ Connecting...');
+                call = await device.connect({
+                    params: { To: 'ai-agent' }
+                });
 
                 call.on('accept', () => {
-                    status.textContent = '🟢 Call Connected!';
+                    log('🟢 Call Connected!');
                     callBtn.style.display = 'none';
                     hangupBtn.style.display = 'inline-block';
                 });
 
                 call.on('disconnect', () => {
-                    status.textContent = '✅ Ready — Call kar sakte ho!';
+                    log('✅ Ready! Call kar sakte ho.');
                     callBtn.style.display = 'inline-block';
                     hangupBtn.style.display = 'none';
                 });
 
                 call.on('error', (err) => {
-                    status.textContent = '❌ Call Error: ' + err.message;
-                    console.error(err);
+                    log('❌ Call Error ' + err.code + ': ' + err.message, true);
                 });
 
             } catch (err) {
-                status.textContent = '❌ Connect failed: ' + err.message;
+                log('❌ Connect failed: ' + err.message, true);
             }
         });
 
@@ -124,7 +107,8 @@
             call?.disconnect();
         });
 
-        setup();
+        // SDK load hone ke baad setup
+        window.onload = setup;
     </script>
 </body>
 
