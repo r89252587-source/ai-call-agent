@@ -10,14 +10,30 @@ const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-// Twilio calls this when someone calls your number
+// // Twilio calls this when someone calls your number
+// app.post('/incoming-call', (req, res) => {
+//     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+//   <Response>
+//     <Connect>
+//       <Stream url="wss://${req.headers.host}/media-stream"/>
+//     </Connect>
+//   </Response>`;
+//     res.type('text/xml').send(twiml);
+// });
+
+
 app.post('/incoming-call', (req, res) => {
+    console.log('Incoming call received:', req.body);
+
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
   <Response>
     <Connect>
-      <Stream url="wss://${req.headers.host}/media-stream"/>
+      <Stream url="wss://${req.headers.host}/media-stream">
+        <Parameter name="caller" value="browser"/>
+      </Stream>
     </Connect>
   </Response>`;
+
     res.type('text/xml').send(twiml);
 });
 
@@ -28,12 +44,38 @@ const AccessToken = twilio.jwt.AccessToken;
 const VoiceGrant = AccessToken.VoiceGrant;
 
 // Browser ko token deta hai
+// app.get('/token', (req, res) => {
+//     const token = new AccessToken(
+//         process.env.TWILIO_ACCOUNT_SID,
+//         process.env.TWILIO_API_KEY,
+//         process.env.TWILIO_API_SECRET,
+//         { identity: 'browser-user' }
+//     );
+
+//     const voiceGrant = new VoiceGrant({
+//         outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID,
+//         incomingAllow: true
+//     });
+
+//     token.addGrant(voiceGrant);
+//     res.json({ token: token.toJwt() });
+// });
+
+
+
+
 app.get('/token', (req, res) => {
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+
     const token = new AccessToken(
         process.env.TWILIO_ACCOUNT_SID,
         process.env.TWILIO_API_KEY,
         process.env.TWILIO_API_SECRET,
-        { identity: 'browser-user' }
+        {
+            identity: 'browser-user',
+            ttl: 3600  // ✅ 1 hour valid rahega
+        }
     );
 
     const voiceGrant = new VoiceGrant({
@@ -42,8 +84,18 @@ app.get('/token', (req, res) => {
     });
 
     token.addGrant(voiceGrant);
+
+    console.log('Token generated for browser-user'); // debug
     res.json({ token: token.toJwt() });
 });
+
+
+
+
+
+
+
+
 
 // Serve browser client from /public
 app.use(express.static(path.join(__dirname, 'public')));
