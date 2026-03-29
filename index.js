@@ -83,6 +83,16 @@ server.on('upgrade', (request, socket, head) => {
     }
 });
 
+app.get('/debug', (req, res) => {
+    res.json({
+        ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID?.slice(0, 8) + '...',
+        API_KEY: process.env.TWILIO_API_KEY?.slice(0, 8) + '...',
+        TWIML_APP_SID: process.env.TWILIO_TWIML_APP_SID,
+        SECRET_SET: !!process.env.TWILIO_API_SECRET,
+        host: req.headers.host
+    });
+});
+
 wss.on('connection', (ws) => {
     console.log('✅ Call connected via /media-stream');
     handleStream(ws);
