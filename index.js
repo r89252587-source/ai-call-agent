@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const { createServer } = require('http');
 const WebSocket = require('ws');
+const path = require('path');
+const twilio = require('twilio');
 const { handleStream } = require('./agent');
 
 const app = express();
@@ -22,7 +24,6 @@ app.post('/incoming-call', (req, res) => {
 
 
 
-const twilio = require('twilio');
 const AccessToken = twilio.jwt.AccessToken;
 const VoiceGrant = AccessToken.VoiceGrant;
 
@@ -44,10 +45,16 @@ app.get('/token', (req, res) => {
     res.json({ token: token.toJwt() });
 });
 
+// Serve browser client from /public
+app.use(express.static(path.join(__dirname, 'public')));
 
-
-
-
+// Warn on startup if required env vars are missing
+[
+    'DEEPGRAM_API_KEY', 'GROQ_API_KEY', 'CARTESIA_API_KEY',
+    'TWILIO_ACCOUNT_SID', 'TWILIO_API_KEY', 'TWILIO_API_SECRET', 'TWILIO_TWIML_APP_SID'
+].forEach(key => {
+    if (!process.env[key]) console.warn(`WARNING: ${key} is not set in .env`);
+});
 
 const server = createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -57,12 +64,5 @@ wss.on('connection', (ws) => {
     handleStream(ws);
 });
 
-
-const path = require('path');
-
-// Yeh line add karo — public folder serve karega
-app.use(express.static(path.join(__dirname, 'public')));
-
-
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
