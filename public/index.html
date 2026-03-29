@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <title>AI Call Agent</title>
     <script src="https://sdk.twilio.com/js/voice/releases/2.10.0/twilio.min.js"></script>
-
     <style>
         body {
             font-family: sans-serif;
@@ -54,41 +53,72 @@
 
     <script>
         let device;
-        let connection;
+        let call;
         const status = document.getElementById('status');
         const callBtn = document.getElementById('call-btn');
         const hangupBtn = document.getElementById('hangup-btn');
 
-        // Token lo aur device setup karo
         async function setup() {
-            const res = await fetch('/token');
-            const { token } = await res.json();
+            try {
+                const res = await fetch('/token');
+                const { token } = await res.json();
 
-            device = new Twilio.Device(token, { codecPreferences: ['opus', 'pcmu'] });
+                // ✅ Naya SDK syntax
+                device = new Twilio.Device(token);
 
-            device.on('ready', () => status.textContent = '✅ Ready — Call kar sakte ho!');
-            device.on('error', (err) => status.textContent = '❌ Error: ' + err.message);
-            device.on('connect', () => {
-                status.textContent = '🟢 Call Connected!';
-                callBtn.style.display = 'none';
-                hangupBtn.style.display = 'inline-block';
-            });
-            device.on('disconnect', () => {
-                status.textContent = '✅ Ready — Call kar sakte ho!';
-                callBtn.style.display = 'inline-block';
-                hangupBtn.style.display = 'none';
-            });
+                device.on('registered', () => {
+                    status.textContent = '✅ Ready — Call kar sakte ho!';
+                });
+
+                device.on('error', (err) => {
+                    status.textContent = '❌ Error: ' + err.message;
+                    console.error(err);
+                });
+
+                device.on('incoming', (incomingCall) => {
+                    call = incomingCall;
+                    call.accept();
+                });
+
+                // ✅ Naya SDK mein register() call karna zaroori hai
+                await device.register();
+
+            } catch (err) {
+                status.textContent = '❌ Setup failed: ' + err.message;
+                console.error(err);
+            }
         }
 
-        // Call karo
-        callBtn.addEventListener('click', () => {
-            connection = device.connect();
-            status.textContent = '⏳ Connecting...';
+        callBtn.addEventListener('click', async () => {
+            try {
+                status.textContent = '⏳ Connecting...';
+                // ✅ Naya SDK mein connect() async hai
+                call = await device.connect();
+
+                call.on('accept', () => {
+                    status.textContent = '🟢 Call Connected!';
+                    callBtn.style.display = 'none';
+                    hangupBtn.style.display = 'inline-block';
+                });
+
+                call.on('disconnect', () => {
+                    status.textContent = '✅ Ready — Call kar sakte ho!';
+                    callBtn.style.display = 'inline-block';
+                    hangupBtn.style.display = 'none';
+                });
+
+                call.on('error', (err) => {
+                    status.textContent = '❌ Call Error: ' + err.message;
+                    console.error(err);
+                });
+
+            } catch (err) {
+                status.textContent = '❌ Connect failed: ' + err.message;
+            }
         });
 
-        // Hang up karo
         hangupBtn.addEventListener('click', () => {
-            device.disconnectAll();
+            call?.disconnect();
         });
 
         setup();
