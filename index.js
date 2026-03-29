@@ -64,5 +64,5 @@ wss.on('connection', (ws) => {
     handleStream(ws);
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on 0.0.0.0:${PORT}`));
