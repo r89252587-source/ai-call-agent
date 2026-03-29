@@ -6,12 +6,10 @@ const { textToSpeech } = require('./tts');
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Conversation memory
-const conversationHistory = [];
 const SYSTEM_PROMPT = `Aap ek helpful AI phone assistant hain.
-Jawab Hindi mein, chhota aur natural rakhein.`;
+Jawab Hindi mein, chhota aur natural rakhein. 2-3 sentences se zyada mat bolein.`;
 
-async function getLLMResponse(userText) {
+async function getLLMResponse(userText, conversationHistory) {
     conversationHistory.push({ role: 'user', content: userText });
 
     const response = await groq.chat.completions.create({
@@ -34,74 +32,102 @@ function handleStream(ws) {
     let dgConnection = null;
     let isProcessing = false;
 
-    // Start Deepgram live transcription
+    // ✅ BUG 4 FIXED: conversationHistory ab per-call hai, global nahi
+    // Pehle yeh bahar tha — sab calls ek hi history share karte the!
+    const conversationHistory = [];
+
+    async function sendAudio(text) {
+        try {
+            const audioBase64 = await textToSpeech(text);
+            if (ws.readyState === ws.OPEN && streamSid) {
+                ws.send(JSON.stringify({
+                    event: 'media',
+                    streamSid,
+                    media: { payload: audioBase64 }
+                }));
+            }
+        } catch (err) {
+            console.error('TTS error:', err.message);
+        }
+    }
+
     async function startDeepgram() {
         dgConnection = deepgram.listen.live({
             model: 'nova-2',
-            language: 'hi',      // Change to 'hi' for Hindi
+            language: 'hi',          // ✅ Sahi language code
             smart_format: true,
             interim_results: true,
-            endpointing: 500,        // ms of silence to end utterance
+            endpointing: 500,
             encoding: 'mulaw',
             sample_rate: 8000
         });
 
+        dgConnection.on(LiveTranscriptionEvents.Open, async () => {
+            console.log('✅ Deepgram connection opened');
+
+            // ✅ BUG 5 FIXED: Greeting message — AI pehle bolta hai
+            await sendAudio('Namaste! Main aapka AI assistant hun. Aap kya jaanna chahte hain?');
+        });
+
         dgConnection.on(LiveTranscriptionEvents.Transcript, async (data) => {
-            const transcript = data.channel.alternatives[0].transcript;
+            const transcript = data.channel?.alternatives?.[0]?.transcript;
             if (!transcript || !data.is_final || isProcessing) return;
 
-            console.log('User said:', transcript);
+            console.log('🎤 User said:', transcript);
             isProcessing = true;
 
             try {
-                // Get AI response
-                const aiReply = await getLLMResponse(transcript);
-                console.log('AI says:', aiReply);
-
-                // Convert to speech and send back to Twilio
-                const audioBase64 = await textToSpeech(aiReply);
-                if (ws.readyState === ws.OPEN && streamSid) {
-                    ws.send(JSON.stringify({
-                        event: 'media',
-                        streamSid,
-                        media: { payload: audioBase64 }
-                    }));
-                }
+                const aiReply = await getLLMResponse(transcript, conversationHistory);
+                console.log('🤖 AI says:', aiReply);
+                await sendAudio(aiReply);
             } catch (err) {
-                console.error('Pipeline error:', err);
+                console.error('Pipeline error:', err.message);
             } finally {
                 isProcessing = false;
             }
         });
 
         dgConnection.on(LiveTranscriptionEvents.Error, (err) => {
-            console.error('Deepgram error:', err);
+            console.error('❌ Deepgram error:', err);
+        });
+
+        dgConnection.on(LiveTranscriptionEvents.Close, () => {
+            console.log('Deepgram connection closed');
         });
     }
 
     startDeepgram();
 
-    // Handle incoming audio from Twilio
     ws.on('message', (message) => {
-        const data = JSON.parse(message);
+        try {
+            const data = JSON.parse(message);
 
-        if (data.event === 'start') {
-            streamSid = data.start.streamSid;
-            console.log('Stream started:', streamSid);
-        }
+            if (data.event === 'start') {
+                streamSid = data.start.streamSid;
+                console.log('📞 Stream started:', streamSid);
+            }
 
-        if (data.event === 'media' && dgConnection) {
-            const audioBuffer = Buffer.from(data.media.payload, 'base64');
-            dgConnection.send(audioBuffer);
-        }
+            if (data.event === 'media' && dgConnection) {
+                const audioBuffer = Buffer.from(data.media.payload, 'base64');
+                dgConnection.send(audioBuffer);
+            }
 
-        if (data.event === 'stop') {
-            console.log('Call ended');
-            dgConnection?.finish();
+            if (data.event === 'stop') {
+                console.log('📵 Call ended');
+                dgConnection?.finish();
+            }
+        } catch (err) {
+            console.error('Message parse error:', err.message);
         }
     });
 
     ws.on('close', () => {
+        console.log('WebSocket closed');
+        dgConnection?.finish();
+    });
+
+    ws.on('error', (err) => {
+        console.error('WebSocket error:', err.message);
         dgConnection?.finish();
     });
 }
