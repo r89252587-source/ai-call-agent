@@ -1,5 +1,6 @@
 const axios = require('axios');
 
+async function textToSpeech(text) {
     try {
         const response = await axios.post(
             'https://api.cartesia.ai/tts/bytes',
