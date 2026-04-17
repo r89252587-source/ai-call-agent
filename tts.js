@@ -6,9 +6,17 @@ async function textToSpeech(text) {
         {
             // ✅ BUG 6 FIXED: Hindi ke liye sonic-multilingual use karo
             // sonic-english Hindi bolne mein galat pronunciation karta tha
+
+            //a0e99841-438c-4a64-b679-ae501e7d6091
             model_id: 'sonic-multilingual',
             transcript: text,
-            voice: { mode: 'id', id: 'a0e99841-438c-4a64-b679-ae501e7d6091' },
+            voice: {
+                mode: 'id',
+                id: '6bc79efd-c7cb-4b36-93a8-444453531015'
+            }, context: {
+                speed: "normal" // Makes it sound less like a robot
+            },
+
             output_format: {
                 container: 'raw',
                 encoding: 'pcm_mulaw',  // Twilio needs mulaw 8kHz
