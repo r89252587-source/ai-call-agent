@@ -9,7 +9,7 @@ async function textToSpeech(text) {
                 transcript: text,
                 voice: {
                     mode: 'id',
-                    id: '6bc79efd-c7cb-4b36-93a8-444453531015' // Ayush (Male)
+                    id: '791d5162-d5eb-40f0-8189-f19db44611d8' // Ayush - Friendly Neighbor
                 },
                 output_format: {
                     container: 'raw',
