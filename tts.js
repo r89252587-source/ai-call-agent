@@ -12,9 +12,11 @@ async function textToSpeech(text) {
             transcript: text,
             voice: {
                 mode: 'id',
-                id: '6bc79efd-c7cb-4b36-93a8-444453531015'
-            }, context: {
-                speed: "normal" // Makes it sound less like a robot
+                id: '6bc79efd-c7cb-4b36-93a8-444453531015', // Ayush (Male)
+                __experimental_controls: {
+                    speed: "normal", 
+                    emotion: ["positivity:high", "curiosity:mid"]
+                }
             },
 
             output_format: {

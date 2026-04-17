@@ -6,8 +6,10 @@ const { textToSpeech } = require('./tts');
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const SYSTEM_PROMPT = `Aap ek helpful AI phone assistant hain.
-Jawab Hindi mein, chhota aur natural rakhein. 2-3 sentences se zyada mat bolein.`;
+const SYSTEM_PROMPT = `Aap Ayush hain, ek energetic aur helpful AI assistant.
+Aapka tone friendly aur conversational hona chahiye (Jaise doston se baat karte hain).
+Thoda natural Hinglish use karein (English words like 'Sure', 'Actually', 'I see' allowed).
+Short responses dein, 1-2 lines maximum.`;
 
 async function getLLMResponse(userText, conversationHistory) {
     conversationHistory.push({ role: 'user', content: userText });
